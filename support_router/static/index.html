@@ -5,46 +5,78 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Intelligent Support Routing</title>
     <style>
-      :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172033; background: #f3f6fb; }
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #172033;
+        background: #f5f7fb;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        --brand: #2457c5;
+        --muted: #647087;
+        --line: #e2e7ef;
+      }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-      main { width: min(720px, 100%); background: white; border: 1px solid #e1e7f0; border-radius: 16px; padding: 32px; box-shadow: 0 16px 48px #17203312; }
-      h1 { margin: 0 0 8px; font-size: clamp(1.6rem, 4vw, 2.2rem); }
-      p { line-height: 1.55; color: #536078; }
-      label { display: block; font-weight: 650; margin: 24px 0 8px; }
-      textarea { width: 100%; min-height: 140px; resize: vertical; border: 1px solid #cbd4e2; border-radius: 10px; padding: 12px; font: inherit; }
-      button { margin-top: 14px; border: 0; border-radius: 9px; padding: 12px 18px; font: inherit; font-weight: 650; color: white; background: #2457c5; cursor: pointer; }
+      body { margin: 0; min-height: 100vh; padding: 32px 18px; }
+      main { width: min(680px, 100%); margin: 6vh auto; background: white; border: 1px solid var(--line); border-radius: 20px; padding: clamp(24px, 5vw, 42px); box-shadow: 0 20px 60px #25365a0c; }
+      .brand { display: inline-flex; align-items: center; gap: 9px; margin-bottom: 30px; color: #384663; font-size: .9rem; font-weight: 700; }
+      .brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 11px; color: white; background: var(--brand); font-size: 1.05rem; }
+      h1 { margin: 0; font-size: clamp(1.75rem, 5vw, 2.35rem); letter-spacing: -.04em; line-height: 1.15; }
+      p { line-height: 1.65; color: var(--muted); }
+      .intro { max-width: 52ch; margin: 12px 0 28px; }
+      label { display: block; font-weight: 650; margin: 0 0 9px; }
+      textarea { display: block; width: 100%; min-height: 156px; resize: vertical; border: 1px solid #cbd4e2; border-radius: 12px; padding: 14px 15px; font: inherit; line-height: 1.55; color: inherit; background: #fff; transition: border-color .15s, box-shadow .15s; }
+      textarea:focus, input:focus, select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px #2457c51c; }
+      textarea::placeholder { color: #8a94a7; }
+      button { display: inline-flex; justify-content: center; align-items: center; min-height: 46px; margin-top: 16px; border: 0; border-radius: 10px; padding: 0 20px; font: inherit; font-weight: 650; color: white; background: var(--brand); cursor: pointer; transition: background .15s, transform .15s; }
+      button:hover:not(:disabled) { background: #1948ad; }
+      button:active:not(:disabled) { transform: translateY(1px); }
+      button:focus-visible, a:focus-visible { outline: 3px solid #2457c555; outline-offset: 3px; }
       button:disabled { opacity: .6; cursor: wait; }
-      #result { margin-top: 24px; padding: 18px; border-radius: 10px; background: #f4f7fc; }
+      #result { margin-top: 26px; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: #f8faff; }
       #result[hidden] { display: none; }
-      #result h2 { margin: 0 0 8px; font-size: 1.15rem; }
-      .note { font-size: .88rem; }
+      #result h2 { margin: 0 0 8px; font-size: 1.3rem; letter-spacing: -.02em; }
+      .note { font-size: .84rem; }
+      .safety-note { margin: 24px 0 10px; padding: 12px 14px; border-radius: 10px; background: #f6f7fa; font-size: .85rem; }
+      .admin-link { display: inline-block; margin-top: 8px; color: var(--brand); font-size: .88rem; font-weight: 600; text-decoration: none; }
+      .admin-link:hover { text-decoration: underline; }
       .error { color: #a12622; }
-      .result-label { margin: 0 0 6px; font-size: .85rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #536078; }
-      .result-action { padding: 14px; border-left: 4px solid #2457c5; background: white; border-radius: 6px; }
+      .result-label { margin: 0 0 8px; font-size: .76rem; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; color: var(--brand); }
+      .result-action { margin: 18px 0; padding: 15px 16px; border: 1px solid var(--line); border-left: 4px solid var(--brand); background: white; border-radius: 8px; color: #34415a; }
+      #result a { color: var(--brand); font-weight: 650; }
+      @media (max-width: 520px) {
+        body { padding: 14px; }
+        main { margin: 2vh auto; padding: 24px 20px; border-radius: 16px; }
+        .brand { margin-bottom: 24px; }
+        button { width: 100%; }
+        #result { padding: 17px; }
+      }
     </style>
   </head>
   <body>
     <main>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">?</span>Support finder</div>
       <h1>Find the right support team</h1>
-      <p>Describe your issue in your own words. We’ll suggest the support team that may be able to help and give you a practical next step.</p>
+      <p class="intro">Tell us what happened. We’ll suggest who may be able to help and what to do next.</p>
       <form id="routing-form">
         <label for="request">What do you need help with?</label>
         <textarea id="request" maxlength="5000" required placeholder="For example: I transferred money, but the recipient has not received it."></textarea>
-        <button id="submit" type="submit">Find the right support</button>
+        <button id="submit" type="submit">Find support</button>
       </form>
       <section id="result" aria-live="polite" hidden></section>
-      <p class="note">This is a research demo, not a live support service. It cannot send your request, contact your organization, or reset your account. Never enter your password or verification code here.</p>
-      <p class="note"><a href="/admin">Support team setup (authorized staff)</a></p>
+      <p class="safety-note">Demo only: your request is not sent to a support team. Never enter your password or verification code.</p>
+      <a class="admin-link" href="/admin">Staff? Manage support teams</a>
     </main>
     <script>
       const form = document.querySelector("#routing-form");
       const button = document.querySelector("#submit");
       const result = document.querySelector("#result");
+      const defaultButtonText = button.textContent;
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         button.disabled = true;
+        button.textContent = "Finding the right team…";
         result.hidden = true;
         result.replaceChildren();
         try {
@@ -106,6 +138,7 @@
           result.hidden = false;
         } finally {
           button.disabled = false;
+          button.textContent = defaultButtonText;
         }
       });
     </script>

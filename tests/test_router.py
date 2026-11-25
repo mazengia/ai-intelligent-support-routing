@@ -38,7 +38,7 @@ def test_api_serves_ui_and_routes_request(tmp_path, monkeypatch):
         assert "Forgot password" in page.text
         assert "Never share your password" in page.text
         assert "Routing score:" not in page.text
-        assert "Support team setup" in page.text
+        assert "Manage support teams" in page.text
         response = client.post(
             "/api/route",
             json={"text": "I cannot log in to my Enat system. Who can reset my password?"},
