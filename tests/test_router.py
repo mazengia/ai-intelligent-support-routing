@@ -139,12 +139,55 @@ def test_admin_can_update_contact_and_add_training_example(tmp_path, monkeypatch
     assert customer_result["suggested_team"]["contact_phone"] == "0986680289"
 
 
+def test_admin_can_add_team_and_model_uses_it(tmp_path, monkeypatch):
+    monkeypatch.setenv("SUPPORT_ROUTER_DB", str(tmp_path / "new-team.sqlite3"))
+    monkeypatch.setenv("SUPPORT_ADMIN_PASSWORD", "test-admin-password")
+    headers = {"Authorization": "Basic YWRtaW46dGVzdC1hZG1pbi1wYXNzd29yZA=="}
+    request_text = "My payroll salary has not been deposited into my account."
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/admin/teams",
+            headers=headers,
+            json={
+                "name": "Payroll Support",
+                "description": "Salary payments, payroll records, and payslips.",
+                "contact_phone": "0900000000",
+                "guidance": "Contact Payroll Support for salary payment help.",
+                "initial_example": request_text,
+            },
+        )
+        assert response.status_code == 201
+        assert response.json()["team"]["id"] == "payroll_support"
+
+        teams = client.get("/api/admin/teams", headers=headers).json()
+        assert any(team["id"] == "payroll_support" for team in teams)
+        route_response = client.post("/api/route", json={"text": request_text})
+        assert route_response.status_code == 200
+        result = route_response.json()
+
+        duplicate = client.post(
+            "/api/admin/teams",
+            headers=headers,
+            json={
+                "name": "Payroll Support",
+                "description": "Duplicate team.",
+                "initial_example": "A duplicate example request.",
+            },
+        )
+
+    assert result["recommended_team"]["id"] == "payroll_support"
+    assert result["suggested_team"]["contact_phone"] == "0900000000"
+    assert duplicate.status_code == 409
+
+
 def test_admin_page_is_available_but_admin_api_requires_password(tmp_path, monkeypatch):
     monkeypatch.setenv("SUPPORT_ROUTER_DB", str(tmp_path / "locked.sqlite3"))
     monkeypatch.delenv("SUPPORT_ADMIN_PASSWORD", raising=False)
 
     with TestClient(app) as client:
         assert client.get("/admin").status_code == 200
+        assert "Add a support team" in client.get("/admin").text
         response = client.get("/api/admin/teams")
 
     assert response.status_code == 503

@@ -38,6 +38,24 @@
 
       <div id="workspace" hidden>
         <section>
+          <h2>Add a support team</h2>
+          <p>Enter a team name, what it handles, its official contact details, and one example request that belongs to it. The example is needed to include the new team in model training.</p>
+          <form id="new-team-form">
+            <label for="new-team-name">Team name</label>
+            <input id="new-team-name" maxlength="100" required placeholder="For example: Payroll Support">
+            <label for="new-team-description">What kinds of requests does this team handle?</label>
+            <textarea id="new-team-description" maxlength="2000" required></textarea>
+            <label for="new-team-phone">Support phone number (optional)</label>
+            <input id="new-team-phone" type="tel" maxlength="50" placeholder="Use an official support number">
+            <label for="new-team-guidance">What should customers do next?</label>
+            <textarea id="new-team-guidance" maxlength="2000" placeholder="Give clear instructions and never ask for passwords or verification codes."></textarea>
+            <label for="new-team-example">Example customer message for this team</label>
+            <textarea id="new-team-example" maxlength="2000" required placeholder="A typical request this team should handle"></textarea>
+            <button id="create-team" type="submit">Add team and train model</button>
+          </form>
+        </section>
+
+        <section>
           <h2>Support team contact and instructions</h2>
           <label for="team">Choose a support team</label>
           <select id="team"></select>
@@ -66,6 +84,7 @@
     </main>
     <script>
       const loginForm = document.querySelector("#admin-form");
+      const newTeamForm = document.querySelector("#new-team-form");
       const passwordInput = document.querySelector("#password");
       const workspace = document.querySelector("#workspace");
       const message = document.querySelector("#message");
@@ -130,6 +149,34 @@
       });
 
       document.querySelector("#team").addEventListener("change", showTeamDetails);
+
+      newTeamForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const button = document.querySelector("#create-team");
+        button.disabled = true;
+        try {
+          const data = await adminFetch("/api/admin/teams", {
+            method: "POST",
+            body: JSON.stringify({
+              name: document.querySelector("#new-team-name").value,
+              description: document.querySelector("#new-team-description").value,
+              contact_phone: document.querySelector("#new-team-phone").value,
+              guidance: document.querySelector("#new-team-guidance").value,
+              initial_example: document.querySelector("#new-team-example").value
+            })
+          });
+          teams = await adminFetch("/api/admin/teams");
+          populateTeamSelect(document.querySelector("#team"), data.team.id);
+          populateTeamSelect(document.querySelector("#example-team"), data.team.id);
+          showTeamDetails();
+          newTeamForm.reset();
+          showMessage(`${data.message} ${data.training_example_count} custom example(s) saved.`);
+        } catch (error) {
+          showMessage(error.message, true);
+        } finally {
+          button.disabled = false;
+        }
+      });
 
       document.querySelector("#save-team").addEventListener("click", async (event) => {
         const button = event.currentTarget;

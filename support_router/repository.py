@@ -211,6 +211,35 @@ class SupportRepository:
                 return None
         return next(team for team in self.get_teams() if team["id"] == team_id)
 
+    def create_team(
+        self,
+        team_id: str,
+        name: str,
+        description: str,
+        contact_phone: str,
+        guidance: str,
+        initial_example: str,
+    ) -> dict[str, str]:
+        with self._connect() as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM support_teams WHERE id = ?", (team_id,)
+            ).fetchone()
+            if exists:
+                raise ValueError("A team with this name already exists.")
+            connection.execute(
+                """
+                INSERT INTO support_teams
+                    (id, name, description, contact_phone, guidance)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (team_id, name, description, contact_phone, guidance),
+            )
+            connection.execute(
+                "INSERT INTO training_examples (text, team_id) VALUES (?, ?)",
+                (initial_example, team_id),
+            )
+        return next(team for team in self.get_teams() if team["id"] == team_id)
+
     def add_example(self, text: str, team_id: str) -> dict[str, int | str]:
         with self._connect() as connection:
             team_exists = connection.execute(

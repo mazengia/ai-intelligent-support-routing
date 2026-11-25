@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 import hmac
 import os
 from pathlib import Path
+import re
 from typing import Literal
 from uuid import uuid4
 
@@ -38,7 +39,7 @@ app = FastAPI(
 
 class RouteRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
-    top_k: int = Field(default=3, ge=1, le=len(TEAMS))
+    top_k: int = Field(default=3, ge=1, le=50)
 
 
 class RouteResponse(BaseModel):
@@ -59,6 +60,10 @@ class TeamUpdate(BaseModel):
     description: str = Field(min_length=1, max_length=2000)
     contact_phone: str = Field(default="", max_length=50)
     guidance: str = Field(default="", max_length=2000)
+
+
+class TeamCreate(TeamUpdate):
+    initial_example: str = Field(min_length=5, max_length=2000)
 
 
 class TrainingExample(BaseModel):
@@ -116,6 +121,41 @@ def list_teams():
 @app.get("/api/admin/teams", dependencies=[Depends(require_admin)])
 def list_admin_teams():
     return app.state.repository.get_teams()
+
+
+@app.post("/api/admin/teams", dependencies=[Depends(require_admin)], status_code=201)
+def create_admin_team(payload: TeamCreate):
+    name = payload.name.strip()
+    description = payload.description.strip()
+    initial_example = payload.initial_example.strip()
+    if not name or not description or len(initial_example) < 5:
+        raise HTTPException(
+            status_code=422,
+            detail="Enter a team name, description, and a meaningful example request.",
+        )
+    team_id = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+    if not team_id:
+        raise HTTPException(
+            status_code=422,
+            detail="The team name must contain at least one English letter or number.",
+        )
+    try:
+        team = app.state.repository.create_team(
+            team_id=team_id,
+            name=name,
+            description=description,
+            contact_phone=payload.contact_phone.strip(),
+            guidance=payload.guidance.strip(),
+            initial_example=initial_example,
+        )
+        app.state.router = SupportRouter(repository=app.state.repository)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return {
+        "team": team,
+        "message": "Support team created. The initial example was saved and the model was retrained.",
+        "training_example_count": app.state.repository.count_examples(),
+    }
 
 
 @app.put("/api/admin/teams/{team_id}", dependencies=[Depends(require_admin)])
