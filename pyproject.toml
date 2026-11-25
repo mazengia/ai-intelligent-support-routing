@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "intelligent-support-routing"
+version = "0.1.0"
+description = "A confidence-aware machine-learning prototype for customer support routing."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "scikit-learn>=1.4",
+]
+
+[project.optional-dependencies]
+test = ["httpx>=0.27", "pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+include = ["support_router*"]
+
+[tool.setuptools.package-data]
+support_router = ["data/*.csv", "static/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

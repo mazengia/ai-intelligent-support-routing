@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Intelligent Support Routing</title>
+    <style>
+      :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172033; background: #f3f6fb; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+      main { width: min(720px, 100%); background: white; border: 1px solid #e1e7f0; border-radius: 16px; padding: 32px; box-shadow: 0 16px 48px #17203312; }
+      h1 { margin: 0 0 8px; font-size: clamp(1.6rem, 4vw, 2.2rem); }
+      p { line-height: 1.55; color: #536078; }
+      label { display: block; font-weight: 650; margin: 24px 0 8px; }
+      textarea { width: 100%; min-height: 140px; resize: vertical; border: 1px solid #cbd4e2; border-radius: 10px; padding: 12px; font: inherit; }
+      button { margin-top: 14px; border: 0; border-radius: 9px; padding: 12px 18px; font: inherit; font-weight: 650; color: white; background: #2457c5; cursor: pointer; }
+      button:disabled { opacity: .6; cursor: wait; }
+      #result { margin-top: 24px; padding: 18px; border-radius: 10px; background: #f4f7fc; }
+      #result[hidden] { display: none; }
+      #result h2 { margin: 0 0 8px; font-size: 1.15rem; }
+      .note { font-size: .88rem; }
+      .error { color: #a12622; }
+      .result-label { margin: 0 0 6px; font-size: .85rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #536078; }
+      .result-action { padding: 14px; border-left: 4px solid #2457c5; background: white; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Find the right support team</h1>
+      <p>Describe your issue in your own words. We’ll suggest the support team that may be able to help and give you a practical next step.</p>
+      <form id="routing-form">
+        <label for="request">What do you need help with?</label>
+        <textarea id="request" maxlength="5000" required placeholder="For example: I transferred money, but the recipient has not received it."></textarea>
+        <button id="submit" type="submit">Find the right support</button>
+      </form>
+      <section id="result" aria-live="polite" hidden></section>
+      <p class="note">This is a research demo, not a live support service. It cannot send your request, contact your organization, or reset your account. Never enter your password or verification code here.</p>
+      <p class="note"><a href="/admin">Support team setup (authorized staff)</a></p>
+    </main>
+    <script>
+      const form = document.querySelector("#routing-form");
+      const button = document.querySelector("#submit");
+      const result = document.querySelector("#result");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        button.disabled = true;
+        result.hidden = true;
+        result.replaceChildren();
+        try {
+          const response = await fetch("/api/route", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: document.querySelector("#request").value })
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || "Unable to route this request.");
+
+          const likelyTeam = data.suggested_team;
+          const label = document.createElement("p");
+          label.className = "result-label";
+          label.textContent = data.status === "recommended"
+            ? "Suggested support team"
+            : "Possible support team — please confirm";
+
+          const heading = document.createElement("h2");
+          const explanation = document.createElement("p");
+          const action = document.createElement("p");
+          action.className = "result-action";
+
+          if (data.predicted_category === "account_access") {
+            heading.textContent = "This sounds like a sign-in or password issue.";
+            explanation.textContent = `The ${likelyTeam.name} team may be the right team to help with account access.`;
+            action.textContent = likelyTeam.guidance || "Try the “Forgot password” or “Reset password” option on your organization's official sign-in page or app. If that does not work, contact the organization using a support channel listed in its official app, website, or branch, and ask for account-access help. Never share your password or a one-time verification code.";
+          } else {
+            heading.textContent = data.status === "recommended"
+              ? `${likelyTeam.name} may be able to help.`
+              : "We found a possible place to start.";
+            explanation.textContent = `Based on your description, this may be a ${likelyTeam.name} issue. ${data.status === "human_review" ? "This is only a suggestion; the right team has not been confirmed." : ""}`;
+            action.textContent = likelyTeam.guidance || `Contact your organization through one of its official support channels and ask for ${likelyTeam.name}. This demo has not sent your request to that team.`;
+          }
+
+          result.append(label, heading, explanation, action);
+          if (likelyTeam.contact_phone) {
+            const phone = document.createElement("p");
+            const phoneLabel = document.createElement("strong");
+            phoneLabel.textContent = "Support phone: ";
+            const phoneLink = document.createElement("a");
+            phoneLink.href = `tel:${likelyTeam.contact_phone.replace(/[^\d+]/g, "")}`;
+            phoneLink.textContent = likelyTeam.contact_phone;
+            phone.append(phoneLabel, phoneLink);
+            result.append(phone);
+          }
+          const reminder = document.createElement("p");
+          reminder.className = "note";
+          reminder.textContent = data.status === "human_review"
+            ? "This is a possible match, not a confirmed assignment. Please verify the contact details with your organization."
+            : "This demo has not sent your request to the team. Please use the official contact details shown.";
+          result.append(reminder);
+          result.hidden = false;
+        } catch (error) {
+          const message = document.createElement("p");
+          message.className = "error";
+          message.textContent = error.message;
+          result.append(message);
+          result.hidden = false;
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,38 @@
+text,team_id
+I forgot my password and cannot sign in to my account,account_access
+My account has been locked after several login attempts,account_access
+The app says my username or password is incorrect,account_access
+I need help resetting my online banking password,account_access
+I cannot access my profile because identity verification failed,account_access
+I sent a bank transfer but the recipient has not received the money,payments
+My deposit is missing from my account balance,payments
+Can you check whether my transfer is pending or completed,payments
+The payment left my account but has not arrived at the other bank,payments
+I need help reconciling a transaction that appears twice,payments
+My debit card was declined even though I have enough funds,cards
+I need to replace my lost credit card,cards
+When will my new bank card be delivered,cards
+Please block my card because it was stolen,cards
+My card payment is being rejected at the shop,cards
+I was charged a fee that does not appear on my invoice,billing
+My monthly statement shows an incorrect balance,billing
+I paid my bill but the account still says payment is due,billing
+Please explain the extra charge on my latest invoice,billing
+I need a copy of my billing statement,billing
+I want to know the status of my loan application,loans
+How much is left to repay on my personal loan,loans
+My loan installment amount looks incorrect,loans
+I would like to ask about eligibility for a home loan,loans
+Can I change the repayment date for my loan,loans
+The mobile app crashes whenever I open the transfers page,technical_support
+The website shows an error when I submit the form,technical_support
+I cannot install the latest version of the application,technical_support
+The service is unavailable and the login page will not load,technical_support
+My screen freezes after I enter the verification code,technical_support
+I cannot sign in because the application keeps crashing,technical_support
+My card payment was declined and I see a duplicate transaction,cards
+My transfer is missing and my balance has gone down,payments
+The invoice amount is wrong and I was billed twice,billing
+I cannot log in to check my loan repayment schedule,account_access
+The loan repayment was taken from my account twice,loans
+The billing page on the website returns an unexpected error,technical_support

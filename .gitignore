@@ -1,0 +1,6 @@
+support_router.sqlite3
+support_router.sqlite3-shm
+support_router.sqlite3-wal
+__pycache__/
+.pytest_cache/
+*.egg-info/

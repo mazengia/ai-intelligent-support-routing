@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Support Routing Setup</title>
+    <style>
+      :root { color-scheme: light; font-family: system-ui, sans-serif; color: #172033; background: #f3f6fb; }
+      * { box-sizing: border-box; }
+      body { margin: 0; padding: 28px 16px; }
+      main { width: min(820px, 100%); margin: auto; background: white; border: 1px solid #e1e7f0; border-radius: 16px; padding: clamp(20px, 5vw, 36px); box-shadow: 0 16px 48px #17203312; }
+      h1 { margin: 0 0 8px; }
+      h2 { margin: 28px 0 8px; font-size: 1.2rem; }
+      p { line-height: 1.55; color: #536078; }
+      label { display: block; margin: 16px 0 6px; font-weight: 650; }
+      input, textarea, select { width: 100%; border: 1px solid #cbd4e2; border-radius: 8px; padding: 10px 12px; font: inherit; background: white; }
+      textarea { min-height: 92px; resize: vertical; }
+      button { margin-top: 16px; border: 0; border-radius: 9px; padding: 11px 16px; font: inherit; font-weight: 650; color: white; background: #2457c5; cursor: pointer; }
+      button:disabled { opacity: .6; cursor: wait; }
+      .notice { margin-top: 16px; padding: 12px; border-radius: 8px; background: #f1f5fb; }
+      .notice.error { color: #a12622; background: #fff1f0; }
+      .security { font-size: .9rem; }
+      a { color: #2457c5; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="/">← Customer support page</a>
+      <h1>Support routing setup</h1>
+      <p>Set the correct support contact details and teach the system with examples from your organization. Save an example with the team that should handle it; the model will retrain automatically.</p>
+      <p class="security">Only authorized staff should use this page. Contact details and instructions are shown to customers. Use this prototype locally or over a secure connection.</p>
+
+      <form id="admin-form">
+        <label for="password">Admin password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <button id="load-button" type="submit">Unlock setup</button>
+      </form>
+
+      <div id="workspace" hidden>
+        <section>
+          <h2>Support team contact and instructions</h2>
+          <label for="team">Choose a support team</label>
+          <select id="team"></select>
+          <label for="name">Name customers should see</label>
+          <input id="name" maxlength="100">
+          <label for="phone">Support phone number (optional)</label>
+          <input id="phone" type="tel" maxlength="50" placeholder="Use an official support number">
+          <label for="description">What kinds of requests does this team handle?</label>
+          <textarea id="description" maxlength="2000"></textarea>
+          <label for="guidance">What should customers do next?</label>
+          <textarea id="guidance" maxlength="2000" placeholder="Give safe, clear instructions. Do not ask customers to share passwords or verification codes."></textarea>
+          <button id="save-team" type="button">Save team details</button>
+        </section>
+
+        <section>
+          <h2>Add a training example</h2>
+          <p>Enter a typical customer message and choose the team that actually handles it. Do not include real customer names, account numbers, passwords, or other private information.</p>
+          <label for="example">Example customer message</label>
+          <textarea id="example" maxlength="2000" placeholder="Example: I cannot sign in to my Enat account. How can I reset my password?"></textarea>
+          <label for="example-team">Correct support team</label>
+          <select id="example-team"></select>
+          <button id="save-example" type="button">Save example and retrain</button>
+        </section>
+      </div>
+      <p id="message" class="notice" role="status" aria-live="polite" hidden></p>
+    </main>
+    <script>
+      const loginForm = document.querySelector("#admin-form");
+      const passwordInput = document.querySelector("#password");
+      const workspace = document.querySelector("#workspace");
+      const message = document.querySelector("#message");
+      let adminPassword = "";
+      let teams = [];
+
+      function showMessage(text, isError = false) {
+        message.textContent = text;
+        message.className = isError ? "notice error" : "notice";
+        message.hidden = false;
+      }
+
+      async function adminFetch(url, options = {}) {
+        const headers = new Headers(options.headers || {});
+        headers.set("Authorization", `Basic ${btoa(`admin:${adminPassword}`)}`);
+        if (options.body) headers.set("Content-Type", "application/json");
+        const response = await fetch(url, { ...options, headers });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "The request could not be completed.");
+        return data;
+      }
+
+      function populateTeamSelect(select, selectedId) {
+        select.replaceChildren();
+        for (const team of teams) {
+          const option = document.createElement("option");
+          option.value = team.id;
+          option.textContent = team.name;
+          option.selected = team.id === selectedId;
+          select.append(option);
+        }
+      }
+
+      function showTeamDetails() {
+        const team = teams.find((item) => item.id === document.querySelector("#team").value);
+        if (!team) return;
+        document.querySelector("#name").value = team.name;
+        document.querySelector("#phone").value = team.contact_phone;
+        document.querySelector("#description").value = team.description;
+        document.querySelector("#guidance").value = team.guidance;
+      }
+
+      loginForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const button = document.querySelector("#load-button");
+        button.disabled = true;
+        adminPassword = passwordInput.value;
+        try {
+          teams = await adminFetch("/api/admin/teams");
+          populateTeamSelect(document.querySelector("#team"), teams[0]?.id);
+          populateTeamSelect(document.querySelector("#example-team"), teams[0]?.id);
+          showTeamDetails();
+          workspace.hidden = false;
+          passwordInput.value = "";
+          showMessage("Setup unlocked. Changes you save will be used by the support routing page.");
+        } catch (error) {
+          adminPassword = "";
+          showMessage(error.message, true);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      document.querySelector("#team").addEventListener("change", showTeamDetails);
+
+      document.querySelector("#save-team").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        try {
+          const id = document.querySelector("#team").value;
+          const data = await adminFetch(`/api/admin/teams/${encodeURIComponent(id)}`, {
+            method: "PUT",
+            body: JSON.stringify({
+              name: document.querySelector("#name").value,
+              contact_phone: document.querySelector("#phone").value,
+              description: document.querySelector("#description").value,
+              guidance: document.querySelector("#guidance").value
+            })
+          });
+          teams = teams.map((team) => team.id === id ? data.team : team);
+          populateTeamSelect(document.querySelector("#team"), id);
+          populateTeamSelect(document.querySelector("#example-team"), document.querySelector("#example-team").value);
+          showMessage("Saved. The model was retrained with the updated team description.");
+        } catch (error) {
+          showMessage(error.message, true);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      document.querySelector("#save-example").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        try {
+          const data = await adminFetch("/api/admin/examples", {
+            method: "POST",
+            body: JSON.stringify({
+              text: document.querySelector("#example").value,
+              team_id: document.querySelector("#example-team").value
+            })
+          });
+          document.querySelector("#example").value = "";
+          showMessage(`${data.message} ${data.training_example_count} custom example(s) saved.`);
+        } catch (error) {
+          showMessage(error.message, true);
+        } finally {
+          button.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
