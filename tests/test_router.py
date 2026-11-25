@@ -181,6 +181,143 @@ def test_admin_can_add_team_and_model_uses_it(tmp_path, monkeypatch):
     assert duplicate.status_code == 409
 
 
+def test_admin_can_disable_enable_edit_and_delete_team(tmp_path, monkeypatch):
+    monkeypatch.setenv("SUPPORT_ROUTER_DB", str(tmp_path / "team-controls.sqlite3"))
+    monkeypatch.setenv("SUPPORT_ADMIN_PASSWORD", "test-admin-password")
+    headers = {"Authorization": "Basic YWRtaW46dGVzdC1hZG1pbi1wYXNzd29yZA=="}
+
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/admin/teams",
+            headers=headers,
+            json={
+                "name": "Payroll Support",
+                "description": "Payroll and salary questions.",
+                "contact_phone": "0900000000",
+                "guidance": "Contact payroll.",
+                "initial_example": "My salary payment is missing.",
+            },
+        )
+        team_id = created.json()["team"]["id"]
+        example_id = client.get("/api/admin/examples", headers=headers).json()[-1]["id"]
+
+        disabled = client.patch(
+            f"/api/admin/teams/{team_id}/enabled?enabled=false", headers=headers
+        )
+        assert disabled.status_code == 200
+        assert disabled.json()["team"]["enabled"] == 0
+        assert team_id not in {team["id"] for team in client.get("/api/teams").json()}
+
+        edited = client.put(
+            f"/api/admin/teams/{team_id}",
+            headers=headers,
+            json={
+                "name": "Enat Payroll",
+                "description": "Enat salary and payslip questions.",
+                "contact_phone": "0911111111",
+                "guidance": "Contact Enat payroll.",
+            },
+        )
+        assert edited.status_code == 200
+        assert edited.json()["team"]["contact_phone"] == "0911111111"
+
+        enabled = client.patch(
+            f"/api/admin/teams/{team_id}/enabled?enabled=true", headers=headers
+        )
+        assert enabled.status_code == 200
+        assert team_id in {team["id"] for team in client.get("/api/teams").json()}
+
+        deleted = client.delete(f"/api/admin/teams/{team_id}", headers=headers)
+        remaining_ids = {
+            team["id"]
+            for team in client.get("/api/admin/teams", headers=headers).json()
+        }
+        examples = client.get("/api/admin/examples", headers=headers).json()
+
+    assert deleted.status_code == 200
+    assert team_id not in remaining_ids
+    assert example_id not in {example["id"] for example in examples}
+    with TestClient(app) as client:
+        persisted_ids = {
+            team["id"]
+            for team in client.get("/api/admin/teams", headers=headers).json()
+        }
+    assert team_id not in persisted_ids
+
+
+def test_admin_can_edit_delete_examples_and_protect_last_custom_example(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv("SUPPORT_ROUTER_DB", str(tmp_path / "example-controls.sqlite3"))
+    monkeypatch.setenv("SUPPORT_ADMIN_PASSWORD", "test-admin-password")
+    headers = {"Authorization": "Basic YWRtaW46dGVzdC1hZG1pbi1wYXNzd29yZA=="}
+
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/admin/teams",
+            headers=headers,
+            json={
+                "name": "Payroll Support",
+                "description": "Payroll and salary questions.",
+                "contact_phone": "0900000000",
+                "guidance": "Contact payroll.",
+                "initial_example": "My salary payment is missing.",
+            },
+        )
+        team_id = created.json()["team"]["id"]
+        example_id = client.get("/api/admin/examples", headers=headers).json()[-1]["id"]
+        changed = client.put(
+            f"/api/admin/examples/{example_id}",
+            headers=headers,
+            json={
+                "text": "My payslip and salary payment have not arrived.",
+                "team_id": team_id,
+            },
+        )
+        blocked_delete = client.delete(
+            f"/api/admin/examples/{example_id}", headers=headers
+        )
+
+        client.post(
+            "/api/admin/examples",
+            headers=headers,
+            json={
+                "text": "I have a question about my payroll record.",
+                "team_id": team_id,
+            },
+        )
+        deleted = client.delete(
+            f"/api/admin/examples/{example_id}", headers=headers
+        )
+
+    assert changed.status_code == 200
+    assert changed.json()["example"]["text"] == "My payslip and salary payment have not arrived."
+    assert blocked_delete.status_code == 409
+    assert deleted.status_code == 200
+
+
+def test_admin_cannot_disable_last_enabled_team(tmp_path, monkeypatch):
+    monkeypatch.setenv("SUPPORT_ROUTER_DB", str(tmp_path / "last-team.sqlite3"))
+    monkeypatch.setenv("SUPPORT_ADMIN_PASSWORD", "test-admin-password")
+    headers = {"Authorization": "Basic YWRtaW46dGVzdC1hZG1pbi1wYXNzd29yZA=="}
+
+    with TestClient(app) as client:
+        teams = client.get("/api/admin/teams", headers=headers).json()
+        for team in teams[1:]:
+            response = client.patch(
+                f"/api/admin/teams/{team['id']}/enabled?enabled=false",
+                headers=headers,
+            )
+            assert response.status_code == 200
+        last_team = teams[0]
+        response = client.patch(
+            f"/api/admin/teams/{last_team['id']}/enabled?enabled=false",
+            headers=headers,
+        )
+
+    assert response.status_code == 409
+
+
 def test_admin_page_is_available_but_admin_api_requires_password(tmp_path, monkeypatch):
     monkeypatch.setenv("SUPPORT_ROUTER_DB", str(tmp_path / "locked.sqlite3"))
     monkeypatch.delenv("SUPPORT_ADMIN_PASSWORD", raising=False)
@@ -188,6 +325,8 @@ def test_admin_page_is_available_but_admin_api_requires_password(tmp_path, monke
     with TestClient(app) as client:
         assert client.get("/admin").status_code == 200
         assert "Add a support team" in client.get("/admin").text
+        assert "Delete team" in client.get("/admin").text
+        assert "Training examples" in client.get("/admin").text
         response = client.get("/api/admin/teams")
 
     assert response.status_code == 503

@@ -11,7 +11,6 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from .catalog import TEAMS
 from .repository import SupportRepository
 from .router import SupportRouter
 
@@ -66,6 +65,11 @@ class TeamCreate(TeamUpdate):
     initial_example: str = Field(min_length=5, max_length=2000)
 
 
+class TrainingExampleUpdate(BaseModel):
+    text: str = Field(min_length=5, max_length=2000)
+    team_id: str
+
+
 class TrainingExample(BaseModel):
     text: str = Field(min_length=5, max_length=2000)
     team_id: str
@@ -115,7 +119,7 @@ def health():
 
 @app.get("/api/teams")
 def list_teams():
-    return app.state.repository.get_teams()
+    return app.state.repository.get_teams(enabled_only=True)
 
 
 @app.get("/api/admin/teams", dependencies=[Depends(require_admin)])
@@ -158,12 +162,87 @@ def create_admin_team(payload: TeamCreate):
     }
 
 
+@app.patch("/api/admin/teams/{team_id}/enabled", dependencies=[Depends(require_admin)])
+def set_admin_team_enabled(team_id: str, enabled: bool):
+    try:
+        team = app.state.repository.set_team_enabled(team_id, enabled)
+        if team is None:
+            raise HTTPException(status_code=404, detail="Support team was not found.")
+        app.state.router = SupportRouter(repository=app.state.repository)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return {
+        "team": team,
+        "message": f"Support team {'enabled' if enabled else 'disabled'}.",
+    }
+
+
+@app.delete("/api/admin/teams/{team_id}", dependencies=[Depends(require_admin)])
+def delete_admin_team(team_id: str):
+    if not app.state.repository.delete_team(team_id):
+        raise HTTPException(status_code=404, detail="Support team was not found.")
+    app.state.router = SupportRouter(repository=app.state.repository)
+    return {"message": "Support team and its saved training examples were deleted."}
+
+
+@app.get("/api/admin/examples", dependencies=[Depends(require_admin)])
+def list_admin_examples():
+    return app.state.repository.get_examples()
+
+
+@app.put(
+    "/api/admin/examples/{example_id}", dependencies=[Depends(require_admin)]
+)
+def update_admin_example(example_id: int, payload: TrainingExampleUpdate):
+    text = payload.text.strip()
+    if len(text) < 5:
+        raise HTTPException(
+            status_code=422, detail="Please enter a longer example request."
+        )
+    try:
+        example = app.state.repository.update_example(
+            example_id, text, payload.team_id
+        )
+        if example is None:
+            raise HTTPException(status_code=404, detail="Training example was not found.")
+        app.state.router = SupportRouter(repository=app.state.repository)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return {
+        "example": example,
+        "message": "Training example updated and the model was retrained.",
+    }
+
+
+@app.delete(
+    "/api/admin/examples/{example_id}", dependencies=[Depends(require_admin)]
+)
+def delete_admin_example(example_id: int):
+    try:
+        deleted = app.state.repository.delete_example(example_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Training example was not found.")
+        app.state.router = SupportRouter(repository=app.state.repository)
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return {
+        "message": "Training example deleted and the model was retrained.",
+        "training_example_count": app.state.repository.count_examples(),
+    }
+
+
 @app.put("/api/admin/teams/{team_id}", dependencies=[Depends(require_admin)])
 def update_admin_team(team_id: str, payload: TeamUpdate):
+    name = payload.name.strip()
+    description = payload.description.strip()
+    if not name or not description:
+        raise HTTPException(
+            status_code=422, detail="Team name and description cannot be blank."
+        )
     team = app.state.repository.update_team(
         team_id=team_id,
-        name=payload.name.strip(),
-        description=payload.description.strip(),
+        name=name,
+        description=description,
         contact_phone=payload.contact_phone.strip(),
         guidance=payload.guidance.strip(),
     )

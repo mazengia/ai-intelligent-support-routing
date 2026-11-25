@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -35,7 +36,7 @@ class SupportRouter:
     ) -> None:
         self.confidence_threshold = confidence_threshold
         self.margin_threshold = margin_threshold
-        self.teams = repository.get_teams() if repository else [
+        self.teams = repository.get_teams(enabled_only=True) if repository else [
             {
                 "id": team.id,
                 "name": team.name,
@@ -45,9 +46,19 @@ class SupportRouter:
             }
             for team in TEAMS
         ]
-        examples = self._load_examples(dataset_path)
+        enabled_team_ids = {team["id"] for team in self.teams}
         if repository:
-            examples.extend(repository.get_examples())
+            examples = [
+                example
+                for example in repository.get_examples()
+                if example["team_id"] in enabled_team_ids
+            ]
+        else:
+            examples = [
+                row
+                for row in self._load_examples(dataset_path)
+                if row["team_id"] in enabled_team_ids
+            ]
         texts = [row["text"] for row in examples]
         labels = [row["team_id"] for row in examples]
 
@@ -58,11 +69,14 @@ class SupportRouter:
             sublinear_tf=True,
         )
         training_vectors = self.vectorizer.fit_transform(texts)
-        self.classifier = LogisticRegression(
-            max_iter=1000,
-            class_weight="balanced",
-            random_state=42,
-        )
+        if len(set(labels)) == 1:
+            self.classifier = DummyClassifier(strategy="constant", constant=labels[0])
+        else:
+            self.classifier = LogisticRegression(
+                max_iter=1000,
+                class_weight="balanced",
+                random_state=42,
+            )
         self.classifier.fit(training_vectors, labels)
         self.team_vectors = self.vectorizer.transform(
             [team["description"] for team in self.teams]
@@ -84,8 +98,8 @@ class SupportRouter:
         cleaned_text = text.strip()
         if not cleaned_text:
             raise ValueError("Request text cannot be empty.")
-        if not 1 <= top_k <= len(self.teams):
-            raise ValueError(f"top_k must be between 1 and {len(self.teams)}.")
+        if top_k < 1:
+            raise ValueError("top_k must be at least 1.")
 
         request_vector = self.vectorizer.transform([cleaned_text])
         category_probabilities = self.classifier.predict_proba(request_vector)[0]
@@ -140,7 +154,10 @@ class SupportRouter:
                 if confident
                 else None
             ),
-            "suggested_team": team_details,
+            "suggested_team": {
+                key: team_details[key]
+                for key in ("id", "name", "description", "contact_phone", "guidance")
+            },
             "candidates": [
                 {
                     "id": candidate.team_id,

@@ -17,6 +17,19 @@
       textarea { min-height: 92px; resize: vertical; }
       button { margin-top: 16px; border: 0; border-radius: 9px; padding: 11px 16px; font: inherit; font-weight: 650; color: white; background: #2457c5; cursor: pointer; }
       button:disabled { opacity: .6; cursor: wait; }
+      .tab-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; border-bottom: 1px solid #dce3ed; }
+      .tab-button { margin: 0 0 -1px; border-radius: 8px 8px 0 0; border: 1px solid transparent; background: transparent; color: #536078; }
+      .tab-button[aria-selected="true"] { border-color: #dce3ed; border-bottom-color: white; background: white; color: #2457c5; }
+      .tab-panel { padding-top: 8px; }
+      .tab-panel[hidden] { display: none; }
+      .management-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+      .management-actions button { margin-top: 12px; }
+      .danger-button { background: #a12622; }
+      .secondary-button { color: #172033; background: #e7edf6; }
+      .team-status { margin: 10px 0 0; font-size: .9rem; }
+      .example-card { margin-top: 16px; padding: 16px; border: 1px solid #dce3ed; border-radius: 10px; }
+      .example-card h3 { margin: 0; font-size: 1rem; }
+      .empty-state { padding: 14px; border-radius: 8px; background: #f1f5fb; }
       .notice { margin-top: 16px; padding: 12px; border-radius: 8px; background: #f1f5fb; }
       .notice.error { color: #a12622; background: #fff1f0; }
       .security { font-size: .9rem; }
@@ -37,7 +50,13 @@
       </form>
 
       <div id="workspace" hidden>
-        <section>
+        <div class="tab-list" role="tablist" aria-label="Support routing administration">
+          <button class="tab-button" id="tab-add-team" type="button" role="tab" aria-selected="false" aria-controls="panel-add-team" tabindex="-1">Add a team</button>
+          <button class="tab-button" id="tab-manage-teams" type="button" role="tab" aria-selected="true" aria-controls="panel-manage-teams">Manage teams</button>
+          <button class="tab-button" id="tab-training-examples" type="button" role="tab" aria-selected="false" aria-controls="panel-training-examples" tabindex="-1">Training examples</button>
+        </div>
+
+        <section class="tab-panel" id="panel-add-team" role="tabpanel" aria-labelledby="tab-add-team" hidden>
           <h2>Add a support team</h2>
           <p>Enter a team name, what it handles, its official contact details, and one example request that belongs to it. The example is needed to include the new team in model training.</p>
           <form id="new-team-form">
@@ -55,7 +74,7 @@
           </form>
         </section>
 
-        <section>
+        <section class="tab-panel" id="panel-manage-teams" role="tabpanel" aria-labelledby="tab-manage-teams">
           <h2>Support team contact and instructions</h2>
           <label for="team">Choose a support team</label>
           <select id="team"></select>
@@ -67,10 +86,15 @@
           <textarea id="description" maxlength="2000"></textarea>
           <label for="guidance">What should customers do next?</label>
           <textarea id="guidance" maxlength="2000" placeholder="Give safe, clear instructions. Do not ask customers to share passwords or verification codes."></textarea>
-          <button id="save-team" type="button">Save team details</button>
+          <p id="team-status" class="team-status"></p>
+          <div class="management-actions">
+            <button id="save-team" type="button">Save changes</button>
+            <button id="toggle-team" class="secondary-button" type="button">Disable team</button>
+            <button id="delete-team" class="danger-button" type="button">Delete team</button>
+          </div>
         </section>
 
-        <section>
+        <section class="tab-panel" id="panel-training-examples" role="tabpanel" aria-labelledby="tab-training-examples" hidden>
           <h2>Add a training example</h2>
           <p>Enter a typical customer message and choose the team that actually handles it. Do not include real customer names, account numbers, passwords, or other private information.</p>
           <label for="example">Example customer message</label>
@@ -78,6 +102,9 @@
           <label for="example-team">Correct support team</label>
           <select id="example-team"></select>
           <button id="save-example" type="button">Save example and retrain</button>
+          <h2>Saved training examples</h2>
+          <p>Edit the request text or correct its assigned team. Deleting a team also deletes its saved examples.</p>
+          <div id="saved-examples"></div>
         </section>
       </div>
       <p id="message" class="notice" role="status" aria-live="polite" hidden></p>
@@ -90,6 +117,32 @@
       const message = document.querySelector("#message");
       let adminPassword = "";
       let teams = [];
+      const tabs = [...document.querySelectorAll('[role="tab"]')];
+
+      function selectTab(selectedTab) {
+        for (const tab of tabs) {
+          const selected = tab === selectedTab;
+          tab.setAttribute("aria-selected", String(selected));
+          tab.tabIndex = selected ? 0 : -1;
+          document.getElementById(tab.getAttribute("aria-controls")).hidden = !selected;
+        }
+      }
+
+      for (const tab of tabs) {
+        tab.addEventListener("click", () => selectTab(tab));
+        tab.addEventListener("keydown", (event) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          const currentIndex = tabs.indexOf(tab);
+          const nextIndex = event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? tabs.length - 1
+              : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+          selectTab(tabs[nextIndex]);
+          tabs[nextIndex].focus();
+        });
+      }
 
       function showMessage(text, isError = false) {
         message.textContent = text;
@@ -107,13 +160,14 @@
         return data;
       }
 
-      function populateTeamSelect(select, selectedId) {
+      function populateTeamSelect(select, selectedId, disableDisabled = false) {
         select.replaceChildren();
         for (const team of teams) {
           const option = document.createElement("option");
           option.value = team.id;
-          option.textContent = team.name;
+          option.textContent = `${team.name}${team.enabled ? "" : " (disabled)"}`;
           option.selected = team.id === selectedId;
+          option.disabled = disableDisabled && !team.enabled && team.id !== selectedId;
           select.append(option);
         }
       }
@@ -125,6 +179,93 @@
         document.querySelector("#phone").value = team.contact_phone;
         document.querySelector("#description").value = team.description;
         document.querySelector("#guidance").value = team.guidance;
+        const enabled = Boolean(team.enabled);
+        document.querySelector("#team-status").textContent = enabled
+          ? "Status: Enabled — customers can be routed to this team."
+          : "Status: Disabled — hidden from customer recommendations.";
+        document.querySelector("#toggle-team").textContent = enabled ? "Disable team" : "Enable team";
+      }
+
+      async function refreshTeams(selectedId) {
+        teams = await adminFetch("/api/admin/teams");
+        populateTeamSelect(document.querySelector("#team"), selectedId);
+        showTeamDetails();
+        return teams;
+      }
+
+      function renderSavedExamples(examples) {
+        const container = document.querySelector("#saved-examples");
+        container.replaceChildren();
+        if (examples.length === 0) {
+          const empty = document.createElement("p");
+          empty.className = "empty-state";
+          empty.textContent = "No custom examples saved yet.";
+          container.append(empty);
+          return;
+        }
+
+        for (const example of examples) {
+          const card = document.createElement("section");
+          card.className = "example-card";
+          const title = document.createElement("h3");
+          title.textContent = `Example #${example.id}`;
+          const label = document.createElement("label");
+          label.textContent = "Customer message";
+          const textarea = document.createElement("textarea");
+          textarea.maxLength = 2000;
+          textarea.value = example.text;
+          label.append(textarea);
+          const teamLabel = document.createElement("label");
+          teamLabel.textContent = "Correct support team";
+          const teamSelect = document.createElement("select");
+          populateTeamSelect(teamSelect, example.team_id, true);
+          teamLabel.append(teamSelect);
+          const actions = document.createElement("div");
+          actions.className = "management-actions";
+          const save = document.createElement("button");
+          save.type = "button";
+          save.textContent = "Save example";
+          save.addEventListener("click", async () => {
+            save.disabled = true;
+            try {
+              await adminFetch(`/api/admin/examples/${example.id}`, {
+                method: "PUT",
+                body: JSON.stringify({ text: textarea.value, team_id: teamSelect.value })
+              });
+              await loadExamples();
+              showMessage("Training example updated and the model retrained.");
+            } catch (error) {
+              showMessage(error.message, true);
+            } finally {
+              save.disabled = false;
+            }
+          });
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "danger-button";
+          remove.textContent = "Delete example";
+          remove.addEventListener("click", async () => {
+            if (!window.confirm("Permanently delete this training example?")) return;
+            remove.disabled = true;
+            try {
+              const response = await adminFetch(`/api/admin/examples/${example.id}`, { method: "DELETE" });
+              await loadExamples();
+              showMessage(response.message);
+            } catch (error) {
+              showMessage(error.message, true);
+            } finally {
+              remove.disabled = false;
+            }
+          });
+          actions.append(save, remove);
+          card.append(title, label, teamLabel, actions);
+          container.append(card);
+        }
+      }
+
+      async function loadExamples() {
+        const examples = await adminFetch("/api/admin/examples");
+        renderSavedExamples(examples);
       }
 
       loginForm.addEventListener("submit", async (event) => {
@@ -135,8 +276,13 @@
         try {
           teams = await adminFetch("/api/admin/teams");
           populateTeamSelect(document.querySelector("#team"), teams[0]?.id);
-          populateTeamSelect(document.querySelector("#example-team"), teams[0]?.id);
+          populateTeamSelect(
+            document.querySelector("#example-team"),
+            teams.find((team) => team.enabled)?.id,
+            true
+          );
           showTeamDetails();
+          await loadExamples();
           workspace.hidden = false;
           passwordInput.value = "";
           showMessage("Setup unlocked. Changes you save will be used by the support routing page.");
@@ -149,6 +295,52 @@
       });
 
       document.querySelector("#team").addEventListener("change", showTeamDetails);
+
+      document.querySelector("#toggle-team").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        const team = teams.find((item) => item.id === document.querySelector("#team").value);
+        if (!team) return;
+        const enable = !Boolean(team.enabled);
+        const action = enable ? "enable" : "disable";
+        if (!window.confirm(`${action[0].toUpperCase()}${action.slice(1)} ${team.name}? ${enable ? "Customers will be able to receive recommendations for this team." : "Customers will no longer be routed to this team."}`)) return;
+        button.disabled = true;
+        try {
+          const data = await adminFetch(`/api/admin/teams/${encodeURIComponent(team.id)}/enabled?enabled=${enable}`, { method: "PATCH" });
+          await refreshTeams(team.id);
+          populateTeamSelect(
+            document.querySelector("#example-team"),
+            enable ? team.id : teams.find((item) => item.enabled)?.id,
+            true
+          );
+          await loadExamples();
+          showMessage(data.message);
+        } catch (error) {
+          showMessage(error.message, true);
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      document.querySelector("#delete-team").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        const team = teams.find((item) => item.id === document.querySelector("#team").value);
+        if (!team) return;
+        if (!window.confirm(`Permanently delete ${team.name} and all its saved training examples? This cannot be undone.`)) return;
+        button.disabled = true;
+        try {
+          const data = await adminFetch(`/api/admin/teams/${encodeURIComponent(team.id)}`, { method: "DELETE" });
+          teams = await adminFetch("/api/admin/teams");
+          populateTeamSelect(document.querySelector("#team"), teams[0]?.id);
+          populateTeamSelect(document.querySelector("#example-team"), teams[0]?.id);
+          showTeamDetails();
+          await loadExamples();
+          showMessage(data.message);
+        } catch (error) {
+          showMessage(error.message, true);
+        } finally {
+          button.disabled = false;
+        }
+      });
 
       newTeamForm.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -170,7 +362,7 @@
           populateTeamSelect(document.querySelector("#example-team"), data.team.id);
           showTeamDetails();
           newTeamForm.reset();
-          showMessage(`${data.message} ${data.training_example_count} custom example(s) saved.`);
+          showMessage(`${data.message} ${data.training_example_count} example(s) saved.`);
         } catch (error) {
           showMessage(error.message, true);
         } finally {
@@ -215,7 +407,7 @@
             })
           });
           document.querySelector("#example").value = "";
-          showMessage(`${data.message} ${data.training_example_count} custom example(s) saved.`);
+          showMessage(`${data.message} ${data.training_example_count} example(s) saved.`);
         } catch (error) {
           showMessage(error.message, true);
         } finally {
