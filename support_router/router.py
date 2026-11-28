@@ -1,4 +1,6 @@
 import csv
+import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -26,6 +28,35 @@ class Candidate:
 
 class SupportRouter:
     """Classify a request and rank eligible support teams."""
+
+    @staticmethod
+    def normalize_text(text: str) -> str:
+        """Normalize common support phrases before training and prediction."""
+        normalized = unicodedata.normalize("NFKC", text).lower().strip()
+        normalized = re.sub(r"[^\w\s]+", " ", normalized, flags=re.UNICODE)
+        normalized = re.sub(r"\s+", " ", normalized)
+        phrases = []
+
+        if "password" in normalized and any(
+            term in normalized
+            for term in ("reset", "recover", "recovering", "forgot", "forgotten")
+        ):
+            phrases.append("canonical account password reset")
+        if any(term in normalized for term in ("cannot log in", "cannot login", "can not log in", "locked out")):
+            phrases.append("canonical account sign in")
+        if "kyc" in normalized and (
+            "maker" in normalized or "checker" in normalized or "role" in normalized
+        ):
+            phrases.append("canonical kyc maker checker access")
+        if any(term in normalized for term in ("transferred", "transfer", "branch transfer")) and any(
+            term in normalized for term in ("profile", "department", "position", "grade", "employee")
+        ):
+            phrases.append("canonical employee record transfer")
+        if "payment" in normalized or "transfer" in normalized:
+            if any(term in normalized for term in ("missing", "not received", "pending", "reconciliation")):
+                phrases.append("canonical missing transfer payment")
+
+        return f"{normalized} {' '.join(phrases)}".strip()
 
     def __init__(
         self,
@@ -59,7 +90,7 @@ class SupportRouter:
                 for row in self._load_examples(dataset_path)
                 if row["team_id"] in enabled_team_ids
             ]
-        texts = [row["text"] for row in examples]
+        texts = [self.normalize_text(row["text"]) for row in examples]
         labels = [row["team_id"] for row in examples]
 
         self.vectorizer = TfidfVectorizer(
@@ -79,7 +110,7 @@ class SupportRouter:
             )
         self.classifier.fit(training_vectors, labels)
         self.team_vectors = self.vectorizer.transform(
-            [team["description"] for team in self.teams]
+            [self.normalize_text(team["description"]) for team in self.teams]
         )
         self.team_ids = [team["id"] for team in self.teams]
 
@@ -101,7 +132,7 @@ class SupportRouter:
         if top_k < 1:
             raise ValueError("top_k must be at least 1.")
 
-        request_vector = self.vectorizer.transform([cleaned_text])
+        request_vector = self.vectorizer.transform([self.normalize_text(cleaned_text)])
         category_probabilities = self.classifier.predict_proba(request_vector)[0]
         class_ids = list(self.classifier.classes_)
         category_scores = dict(zip(class_ids, category_probabilities))
@@ -154,10 +185,14 @@ class SupportRouter:
                 if confident
                 else None
             ),
-            "suggested_team": {
-                key: team_details[key]
-                for key in ("id", "name", "description", "contact_phone", "guidance")
-            },
+            "suggested_team": (
+                {
+                    key: team_details[key]
+                    for key in ("id", "name", "description", "contact_phone", "guidance")
+                }
+                if confident
+                else None
+            ),
             "candidates": [
                 {
                     "id": candidate.team_id,

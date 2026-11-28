@@ -3,87 +3,251 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f7fb">
     <title>Intelligent Support Routing</title>
     <style>
       :root {
         color-scheme: light;
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        color: #172033;
+        color: #17243b;
         background: #f5f7fb;
         font-synthesis: none;
         text-rendering: optimizeLegibility;
-        --brand: #2457c5;
-        --muted: #647087;
-        --line: #e2e7ef;
+        --brand: #3158d5;
+        --brand-dark: #2344b0;
+        --teal: #18a88f;
+        --muted: #64728a;
+        --line: #e5eaf2;
+        --surface: #fff;
       }
       * { box-sizing: border-box; }
-      body { margin: 0; min-height: 100vh; padding: 32px 18px; }
-      main { width: min(680px, 100%); margin: 6vh auto; background: white; border: 1px solid var(--line); border-radius: 20px; padding: clamp(24px, 5vw, 42px); box-shadow: 0 20px 60px #25365a0c; }
-      .brand { display: inline-flex; align-items: center; gap: 9px; margin-bottom: 30px; color: #384663; font-size: .9rem; font-weight: 700; }
-      .brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 11px; color: white; background: var(--brand); font-size: 1.05rem; }
-      h1 { margin: 0; font-size: clamp(1.75rem, 5vw, 2.35rem); letter-spacing: -.04em; line-height: 1.15; }
-      p { line-height: 1.65; color: var(--muted); }
-      .intro { max-width: 52ch; margin: 12px 0 28px; }
-      label { display: block; font-weight: 650; margin: 0 0 9px; }
-      textarea { display: block; width: 100%; min-height: 156px; resize: vertical; border: 1px solid #cbd4e2; border-radius: 12px; padding: 14px 15px; font: inherit; line-height: 1.55; color: inherit; background: #fff; transition: border-color .15s, box-shadow .15s; }
-      textarea:focus, input:focus, select:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px #2457c51c; }
-      textarea::placeholder { color: #8a94a7; }
-      button { display: inline-flex; justify-content: center; align-items: center; min-height: 46px; margin-top: 16px; border: 0; border-radius: 10px; padding: 0 20px; font: inherit; font-weight: 650; color: white; background: var(--brand); cursor: pointer; transition: background .15s, transform .15s; }
-      button:hover:not(:disabled) { background: #1948ad; }
-      button:active:not(:disabled) { transform: translateY(1px); }
-      button:focus-visible, a:focus-visible { outline: 3px solid #2457c555; outline-offset: 3px; }
-      button:disabled { opacity: .6; cursor: wait; }
-      #result { margin-top: 26px; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: #f8faff; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(ellipse at 86% 0%, #e5ebff 0, transparent 34rem),
+          radial-gradient(ellipse at 0% 40%, #e6f7f3 0, transparent 28rem),
+          #f5f7fb;
+      }
+      a { color: inherit; }
+      .shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+      .topbar { height: 82px; display: flex; align-items: center; justify-content: space-between; }
+      .brand { display: inline-flex; align-items: center; gap: 11px; color: #1b2942; font-size: .96rem; font-weight: 760; letter-spacing: -.02em; text-decoration: none; }
+      .brand-mark { display: grid; width: 40px; height: 40px; place-items: center; border-radius: 14px; color: #fff; background: linear-gradient(145deg, #4468e5, #2748ba); box-shadow: 0 7px 16px #3158d533; }
+      .brand-mark svg { width: 23px; height: 23px; }
+      .top-link { color: #475671; font-size: .88rem; font-weight: 650; text-decoration: none; }
+      .top-link:hover { color: var(--brand); }
+      .hero { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: center; gap: 40px; padding: 48px 0 38px; }
+      .eyebrow { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 17px; color: #3e59b8; font-size: .76rem; font-weight: 780; letter-spacing: .12em; text-transform: uppercase; }
+      .eyebrow::before { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); content: ""; box-shadow: 0 0 0 4px #18a88f1c; }
+      h1 { max-width: 700px; margin: 0; color: #17243b; font-size: clamp(2.4rem, 5.2vw, 4.1rem); letter-spacing: -.065em; line-height: 1.04; }
+      h1 span { color: var(--brand); }
+      .hero-copy { max-width: 610px; margin: 19px 0 0; color: var(--muted); font-size: 1.08rem; line-height: 1.75; }
+      .hero-art { position: relative; display: grid; min-height: 220px; place-items: center; }
+      .orbit { position: absolute; width: 208px; height: 208px; border: 1px solid #d5def8; border-radius: 50%; }
+      .orbit::before, .orbit::after { position: absolute; border: 1px solid #e1e8fa; border-radius: 50%; content: ""; }
+      .orbit::before { inset: 20px; }
+      .orbit::after { inset: 42px; }
+      .art-core { z-index: 1; display: grid; width: 94px; height: 94px; place-items: center; border: 8px solid #eef2ff; border-radius: 29px; color: white; background: linear-gradient(145deg, #4568e4, #2848bb); box-shadow: 0 16px 35px #3158d544; }
+      .art-core svg { width: 40px; height: 40px; }
+      .art-node { position: absolute; z-index: 2; display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid #e3e8f1; border-radius: 14px; color: #4260c5; background: white; box-shadow: 0 8px 20px #24345212; }
+      .art-node svg { width: 20px; height: 20px; }
+      .node-one { top: 17px; left: 58px; }
+      .node-two { top: 47px; right: 12px; color: #15947e; }
+      .node-three { right: 44px; bottom: 8px; color: #b2782d; }
+      .node-four { bottom: 26px; left: 20px; color: #a45ca1; }
+      .workspace { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(250px, .75fr); gap: 20px; align-items: start; padding-bottom: 56px; }
+      .card { border: 1px solid #e4e9f2; border-radius: 22px; background: var(--surface); box-shadow: 0 18px 48px #2839590c; }
+      .form-card { padding: clamp(22px, 4vw, 34px); }
+      .card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
+      h2 { margin: 0; color: #192741; font-size: 1.22rem; letter-spacing: -.025em; }
+      .subheading { margin: 7px 0 0; color: var(--muted); font-size: .91rem; line-height: 1.6; }
+      .demo-badge { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; padding: 8px 11px; border: 1px solid #dce5ff; border-radius: 999px; color: #3c57b2; background: #f4f6ff; font-size: .75rem; font-weight: 750; }
+      .demo-badge::before { width: 7px; height: 7px; border-radius: 50%; background: #5c77e3; content: ""; }
+      label { display: block; margin: 0 0 9px; color: #273550; font-size: .9rem; font-weight: 700; }
+      textarea { display: block; width: 100%; min-height: 154px; resize: vertical; border: 1px solid #d5dce8; border-radius: 14px; padding: 15px 16px; font: inherit; line-height: 1.65; color: #192741; background: #fcfdff; transition: border-color .16s, box-shadow .16s, background .16s; }
+      textarea:focus, input:focus, select:focus { outline: none; border-color: #7088e6; background: #fff; box-shadow: 0 0 0 4px #3158d51a; }
+      textarea::placeholder { color: #929db0; }
+      .prompt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 22px; }
+      .prompt-label { margin-right: 2px; color: #77839a; font-size: .78rem; font-weight: 650; }
+      .prompt-chip { min-height: 32px; padding: 0 11px; border: 1px solid #e0e6f0; border-radius: 999px; color: #4a5872; background: white; font: inherit; font-size: .77rem; font-weight: 600; cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
+      .prompt-chip:hover { border-color: #b9c6f2; color: var(--brand); background: #f6f8ff; }
+      .submit-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+      .privacy-hint { display: flex; align-items: center; gap: 8px; margin: 0; color: #78849a; font-size: .78rem; line-height: 1.5; }
+      .privacy-hint svg { flex: 0 0 auto; width: 16px; height: 16px; color: #638272; }
+      button.primary { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; margin: 0; padding: 0 20px; border: 0; border-radius: 12px; color: white; background: linear-gradient(130deg, #3e61dc, #2c4fc4); box-shadow: 0 8px 18px #3158d533; font: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; transition: transform .16s, box-shadow .16s, opacity .16s; }
+      button.primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 11px 22px #3158d544; }
+      button.primary:active:not(:disabled) { transform: translateY(0); }
+      button:focus-visible, a:focus-visible { outline: 3px solid #3158d555; outline-offset: 3px; }
+      button:disabled { opacity: .62; cursor: wait; }
+      button.primary svg { width: 17px; height: 17px; }
+      #result { margin-top: 21px; padding: 22px; border: 1px solid #dfe6f3; border-radius: 16px; background: linear-gradient(145deg, #f8faff, #fff); animation: appear .24s ease-out; }
       #result[hidden] { display: none; }
-      #result h2 { margin: 0 0 8px; font-size: 1.3rem; letter-spacing: -.02em; }
-      .note { font-size: .84rem; }
-      .safety-note { margin: 24px 0 10px; padding: 12px 14px; border-radius: 10px; background: #f6f7fa; font-size: .85rem; }
-      .admin-link { display: inline-block; margin-top: 8px; color: var(--brand); font-size: .88rem; font-weight: 600; text-decoration: none; }
-      .admin-link:hover { text-decoration: underline; }
+      #result h2 { margin: 0 0 8px; font-size: 1.25rem; }
+      #result p { line-height: 1.65; }
+      .result-label { display: inline-flex; margin: 0 0 11px; padding: 6px 9px; border-radius: 999px; color: #3854b2; background: #eaf0ff; font-size: .7rem; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+      .result-action { margin: 16px 0; padding: 14px 16px; border: 1px solid #e2e8f4; border-left: 3px solid var(--brand); border-radius: 10px; color: #3d4b64; background: white; }
+      #result a { color: var(--brand); font-weight: 700; }
+      .note { color: #78849a; font-size: .82rem; }
       .error { color: #a12622; }
-      .result-label { margin: 0 0 8px; font-size: .76rem; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; color: var(--brand); }
-      .result-action { margin: 18px 0; padding: 15px 16px; border: 1px solid var(--line); border-left: 4px solid var(--brand); background: white; border-radius: 8px; color: #34415a; }
-      #result a { color: var(--brand); font-weight: 650; }
+      .feedback { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 17px 0 0; padding-top: 15px; border-top: 1px solid #e8edf5; color: #53617a; font-size: .84rem; }
+      .feedback button { min-height: 32px; padding: 0 12px; border: 1px solid #dde4ef; border-radius: 8px; color: #41516d; background: white; font: inherit; font-size: .78rem; font-weight: 650; cursor: pointer; }
+      .feedback button:hover:not(:disabled) { border-color: #b8c5ed; color: var(--brand); background: #f7f8ff; }
+      .aside-card { padding: 25px; }
+      .aside-title { margin: 0; color: #1c2a43; font-size: 1rem; letter-spacing: -.02em; }
+      .aside-copy { margin: 8px 0 21px; color: var(--muted); font-size: .84rem; line-height: 1.65; }
+      .steps { display: grid; gap: 18px; }
+      .step { display: grid; grid-template-columns: 35px 1fr; gap: 12px; align-items: start; }
+      .step-icon { display: grid; width: 35px; height: 35px; place-items: center; border-radius: 11px; color: #4260c5; background: #eef2ff; }
+      .step-icon svg { width: 17px; height: 17px; }
+      .step:nth-child(2) .step-icon { color: #138b78; background: #eaf8f5; }
+      .step:nth-child(3) .step-icon { color: #9c6b25; background: #fff5e7; }
+      .step h3 { margin: 1px 0 4px; color: #283650; font-size: .84rem; }
+      .step p { margin: 0; color: #77839a; font-size: .78rem; line-height: 1.55; }
+      .disclaimer { margin: 22px 0 0; padding: 12px 13px; border: 1px solid #e8edf4; border-radius: 10px; color: #77839a; background: #f8f9fc; font-size: .74rem; line-height: 1.55; }
+      .footer { display: flex; justify-content: space-between; gap: 20px; padding: 0 0 28px; color: #8994a7; font-size: .76rem; }
+      .footer a { color: #596884; font-weight: 650; text-decoration: none; }
+      .footer a:hover { color: var(--brand); }
+      @keyframes appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+      @media (max-width: 760px) {
+        .hero { grid-template-columns: 1fr; gap: 4px; padding: 34px 0 25px; }
+        .hero-art { display: none; }
+        .workspace { grid-template-columns: 1fr; }
+        .aside-card { order: 2; }
+      }
       @media (max-width: 520px) {
-        body { padding: 14px; }
-        main { margin: 2vh auto; padding: 24px 20px; border-radius: 16px; }
-        .brand { margin-bottom: 24px; }
-        button { width: 100%; }
-        #result { padding: 17px; }
+        .shell { width: min(100% - 28px, 1120px); }
+        .topbar { height: 68px; }
+        .brand { font-size: .88rem; }
+        .brand-mark { width: 36px; height: 36px; border-radius: 12px; }
+        .top-link { font-size: .8rem; }
+        .hero { padding: 34px 0 25px; }
+        h1 { font-size: clamp(2.35rem, 13vw, 3.2rem); }
+        .hero-copy { font-size: .96rem; }
+        .workspace { gap: 14px; padding-bottom: 34px; }
+        .card { border-radius: 18px; }
+        .form-card { padding: 21px 17px; }
+        .card-heading { display: block; }
+        .demo-badge { margin-top: 13px; }
+        textarea { min-height: 135px; }
+        .submit-row { align-items: stretch; flex-direction: column; }
+        button.primary { width: 100%; }
+        .aside-card { padding: 21px 18px; }
+        #result { padding: 18px 16px; }
+        .footer { flex-direction: column; gap: 6px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
       }
     </style>
   </head>
   <body>
-    <main>
-      <div class="brand"><span class="brand-mark" aria-hidden="true">?</span>Support finder</div>
-      <h1>Find the right support team</h1>
-      <p class="intro">Tell us what happened. We’ll suggest who may be able to help and what to do next.</p>
-      <form id="routing-form">
-        <label for="request">What do you need help with?</label>
-        <textarea id="request" maxlength="5000" required placeholder="For example: I transferred money, but the recipient has not received it."></textarea>
-        <button id="submit" type="submit">Find support</button>
-      </form>
-      <section id="result" aria-live="polite" hidden></section>
-      <p class="safety-note">Demo only: your request is not sent to a support team. Never enter your password or verification code.</p>
-      <a class="admin-link" href="/admin">Staff? Manage support teams</a>
+    <header class="topbar shell">
+      <a class="brand" href="/" aria-label="Intelligent Support Routing home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="5" r="1.7"/><circle cx="19" cy="5" r="1.7"/><circle cx="5" cy="19" r="1.7"/><circle cx="19" cy="19" r="1.7"/><path d="m7 6.5 3.2 4M17 6.5l-3.2 4M7 17.5l3.2-4M17 17.5l-3.2-4"/></svg>
+        </span>
+        Intelligent Support Routing
+      </a>
+      <a class="top-link" href="/admin">Staff workspace <span aria-hidden="true">→</span></a>
+    </header>
+
+    <section class="hero shell">
+      <div>
+        <p class="eyebrow">AI-assisted support navigation</p>
+        <h1>Get to the right team, <span>faster.</span></h1>
+        <p class="hero-copy">Describe what you need in your own words. The prototype analyzes your request and suggests a support team—or asks for human review when it is uncertain.</p>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="orbit"></div>
+        <div class="art-core"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.5"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1m8.8 8.8 2.1 2.1m0-13-2.1 2.1m-8.8 8.8-2.1 2.1"/><circle cx="12" cy="12" r="8.1"/></svg></div>
+        <div class="art-node node-one"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v11H9l-5 3v-14Z"/><path d="M8 9h8m-8 3h5"/></svg></div>
+        <div class="art-node node-two"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 7v5c0 4.3 3.1 7.5 7.5 9 4.4-1.5 7.5-4.7 7.5-9V7L12 3Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <div class="art-node node-three"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.3"/><path d="M5 20c.5-3.4 3.1-5.3 7-5.3s6.5 1.9 7 5.3"/></svg></div>
+        <div class="art-node node-four"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18V6m0 12h16M7 15l4-4 3 2 5-6"/><path d="M16 7h3v3"/></svg></div>
+      </div>
+    </section>
+
+    <main class="workspace shell">
+      <section class="card form-card">
+        <div class="card-heading">
+          <div>
+            <h2>Tell us what happened</h2>
+            <p class="subheading">A sentence or two is enough to get started.</p>
+          </div>
+          <span class="demo-badge">Interactive prototype</span>
+        </div>
+        <form id="routing-form">
+          <label for="request">What do you need help with?</label>
+          <textarea id="request" maxlength="5000" required placeholder="For example: I transferred money, but the recipient has not received it."></textarea>
+          <div class="prompt-row" aria-label="Example requests">
+            <span class="prompt-label">Try an example:</span>
+            <button class="prompt-chip" type="button" data-example="I need to reset my Enat system password">Password reset</button>
+            <button class="prompt-chip" type="button" data-example="I transferred money, but the recipient has not received it">Missing transfer</button>
+            <button class="prompt-chip" type="button" data-example="My employee profile still shows my old department">Employee profile</button>
+          </div>
+          <div class="submit-row">
+            <p class="privacy-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 7v5c0 4.3 3.1 7.5 7.5 9 4.4-1.5 7.5-4.7 7.5-9V7L12 3Z"/><path d="M9 12h6"/></svg>Never enter passwords or verification codes.</p>
+            <button id="submit" class="primary" type="submit">
+              <span>Find support</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+            </button>
+          </div>
+        </form>
+        <section id="result" aria-live="polite" hidden></section>
+      </section>
+
+      <aside class="card aside-card">
+        <h2 class="aside-title">A clearer path to support</h2>
+        <p class="aside-copy">This prototype uses machine learning to help connect a request with the right support destination.</p>
+        <div class="steps">
+          <div class="step">
+            <span class="step-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16v11H9l-5 3v-14Z"/><path d="M8 9h8m-8 3h5"/></svg></span>
+            <div><h3>Describe your issue</h3><p>Use your own words—no need to know internal team names.</p></div>
+          </div>
+          <div class="step">
+            <span class="step-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4M8.5 11h5m-2.5-2.5v5"/></svg></span>
+            <div><h3>Get a team suggestion</h3><p>See a likely destination and practical next steps when confidence is sufficient.</p></div>
+          </div>
+          <div class="step">
+            <span class="step-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4.5 7v5c0 4.3 3.1 7.5 7.5 9 4.4-1.5 7.5-4.7 7.5-9V7L12 3Z"/><path d="M9 12.2 11 14l4-4"/></svg></span>
+            <div><h3>Keep a human in the loop</h3><p>Unclear requests are flagged for more detail or staff review.</p></div>
+          </div>
+        </div>
+        <p class="disclaimer">Prototype demonstration only. Requests are not sent to a support team. Suggestions may be incorrect; confirm contact details with your organization.</p>
+      </aside>
     </main>
+
+    <footer class="footer shell">
+      <span>Intelligent Support Routing · Research prototype</span>
+      <a href="/admin">Staff workspace <span aria-hidden="true">→</span></a>
+    </footer>
+
     <script>
       const form = document.querySelector("#routing-form");
       const button = document.querySelector("#submit");
       const result = document.querySelector("#result");
-      const defaultButtonText = button.textContent;
+      const defaultButtonText = button.querySelector("span").textContent;
+      const requestInput = document.querySelector("#request");
+
+      document.querySelectorAll("[data-example]").forEach((chip) => {
+        chip.addEventListener("click", () => {
+          requestInput.value = chip.dataset.example;
+          requestInput.focus();
+        });
+      });
 
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         button.disabled = true;
-        button.textContent = "Finding the right team…";
+        button.querySelector("span").textContent = "Finding a team…";
         result.hidden = true;
         result.replaceChildren();
         try {
           const response = await fetch("/api/route", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text: document.querySelector("#request").value })
+            body: JSON.stringify({ text: requestInput.value })
           });
           const data = await response.json();
           if (!response.ok) throw new Error(data.detail || "Unable to route this request.");
@@ -93,27 +257,29 @@
           label.className = "result-label";
           label.textContent = data.status === "recommended"
             ? "Suggested support team"
-            : "Possible support team — please confirm";
+            : "Human review needed";
 
           const heading = document.createElement("h2");
           const explanation = document.createElement("p");
           const action = document.createElement("p");
           action.className = "result-action";
 
-          if (data.predicted_category === "account_access") {
+          if (data.status === "human_review" && !likelyTeam) {
+            heading.textContent = "We need a little more detail.";
+            explanation.textContent = "Your request does not match a support team confidently. Please describe the issue, the service affected, and what happened.";
+            action.textContent = "Add more details or contact your organization through its official support channel. Do not enter passwords or verification codes.";
+          } else if (data.status === "recommended" && data.predicted_category === "account_access") {
             heading.textContent = "This sounds like a sign-in or password issue.";
             explanation.textContent = `The ${likelyTeam.name} team may be the right team to help with account access.`;
             action.textContent = likelyTeam.guidance || "Try the “Forgot password” or “Reset password” option on your organization's official sign-in page or app. If that does not work, contact the organization using a support channel listed in its official app, website, or branch, and ask for account-access help. Never share your password or a one-time verification code.";
           } else {
-            heading.textContent = data.status === "recommended"
-              ? `${likelyTeam.name} may be able to help.`
-              : "We found a possible place to start.";
-            explanation.textContent = `Based on your description, this may be a ${likelyTeam.name} issue. ${data.status === "human_review" ? "This is only a suggestion; the right team has not been confirmed." : ""}`;
+            heading.textContent = `${likelyTeam.name} may be able to help.`;
+            explanation.textContent = `Based on your description, this may be a ${likelyTeam.name} issue.`;
             action.textContent = likelyTeam.guidance || `Contact your organization through one of its official support channels and ask for ${likelyTeam.name}. This demo has not sent your request to that team.`;
           }
 
           result.append(label, heading, explanation, action);
-          if (likelyTeam.contact_phone) {
+          if (likelyTeam && likelyTeam.contact_phone) {
             const phone = document.createElement("p");
             const phoneLabel = document.createElement("strong");
             phoneLabel.textContent = "Support phone: ";
@@ -126,9 +292,37 @@
           const reminder = document.createElement("p");
           reminder.className = "note";
           reminder.textContent = data.status === "human_review"
-            ? "This is a possible match, not a confirmed assignment. Please verify the contact details with your organization."
+            ? "No team or contact has been confirmed. Please add details or contact your organization through an official support channel."
             : "This demo has not sent your request to the team. Please use the official contact details shown.";
           result.append(reminder);
+
+          const feedback = document.createElement("div");
+          feedback.className = "feedback";
+          const feedbackPrompt = document.createElement("span");
+          feedbackPrompt.textContent = "Was this suggestion helpful?";
+          feedback.append(feedbackPrompt);
+          for (const [labelText, helpful] of [["Yes", true], ["No", false]]) {
+            const feedbackButton = document.createElement("button");
+            feedbackButton.type = "button";
+            feedbackButton.textContent = labelText;
+            feedbackButton.addEventListener("click", async () => {
+              feedbackButton.disabled = true;
+              try {
+                const feedbackResponse = await fetch(`/api/requests/${encodeURIComponent(data.request_id)}/feedback`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ helpful })
+                });
+                if (!feedbackResponse.ok) throw new Error("Feedback could not be saved.");
+                feedback.replaceChildren(document.createTextNode("Thank you — your feedback was saved."));
+              } catch (_error) {
+                feedbackPrompt.textContent = "Feedback could not be saved. Please try again.";
+                feedbackButton.disabled = false;
+              }
+            });
+            feedback.append(feedbackButton);
+          }
+          result.append(feedback);
           result.hidden = false;
         } catch (error) {
           const message = document.createElement("p");
@@ -138,7 +332,7 @@
           result.hidden = false;
         } finally {
           button.disabled = false;
-          button.textContent = defaultButtonText;
+          button.querySelector("span").textContent = defaultButtonText;
         }
       });
     </script>
